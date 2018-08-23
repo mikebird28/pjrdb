@@ -8,7 +8,17 @@ import sqlite3
 from tqdm import tqdm
 import csv_format
 
-PARSE_FILE_NUM_ON_DEBUG = 10
+PARSE_FILE_NUM_ON_DEBUG = 50
+
+
+target_prefix = {
+    "horse_result" : "SED",
+    "horse_info"   : "KYI",
+    "latest_info"  : "TYB",
+    "race_info"    : "BAC",
+    "extra_info"   : "kka",
+    "train_info"   : "CYB",
+}
 
 formats = [
     csv_format.Format("horse_result","./formats/horse_result.csv"),
@@ -16,6 +26,7 @@ formats = [
     csv_format.Format("race_info","./formats/race_info.csv"),
     csv_format.Format("latest_info","./formats/latest_info.csv"),
     csv_format.Format("extra_info","./formats/extra_info.csv"),
+    csv_format.Format("train_info","./formats/train_info.csv"),
 ]
 
 #remove duplicates before merege
@@ -25,6 +36,7 @@ drop_dict = {
     "race_info" : ["RaceID"],
     "latest_info" : ["HorseID"],
     "extra_info" : ["HorseID"],
+    "train_info" : ["HorseID"],
 }
 
 def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache.db"):
@@ -33,7 +45,8 @@ def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache
     target_path = "./raw_text/"
     for f in formats:
         print("[*] parsing {}".format(f.name))
-        parser = Parse(f,is_debug)
+        file_prefix = target_prefix[f.name]
+        parser = Parse(f,is_debug,file_prefix)
         path = os.path.join(target_path,f.name)
         
         df = parser.parse(path)
@@ -58,6 +71,7 @@ def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache
     start_time = time.time()
     count = 0
 
+    dtypes = None
     with open(output_path,"a") as f:
         #pbar = tqdm(total=100)
         is_first_write = True
@@ -70,16 +84,30 @@ def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache
                 is_first_write = False
             else:
                 df.to_csv(f,index = False,header = False)
+
+            if dtypes is None:
+                dtypes = df.dtypes
+            else:
+                dtypes = update_dtypes(dtypes,df.dtypes)
         #pbar.close()
-    write_dtype_csv("./dtypes.csv",df)
+        write_dtype_csv("./dtypes.csv",dtypes)
     elapsed_time = time.time() - start_time
     print(elapsed_time)
     return df
 
 def to_sql(db_path,df_dict):
+    type_converter = {
+        "int32"   : "INTEGER",
+        "float32" : "REAL",
+        "object"  : "TEXT",
+    }
     con = sqlite3.connect(db_path)
     for name,df in tqdm(df_dict.items()):
-        df.to_sql(name,con,index = False, if_exists = "replace")
+        type_dict = {}
+        for c in df.columns:
+            sql_type = type_converter[str(df.dtypes[c])]
+            type_dict[c] = sql_type
+        df.to_sql(name,con,index = False, if_exists = "replace",dtype = type_dict)
     return con
 
 def merge_df(db_con,chunk_size):
@@ -88,6 +116,7 @@ def merge_df(db_con,chunk_size):
         Joint("horse_info","horse_result","HorseID","HorseID","hi","hr",how = "inner"),
         Joint("horse_info","race_info","RaceID","RaceID","hi","ri"),
         Joint("horse_info","latest_info","HorseID","HorseID","hi","li"),
+        Joint("horse_info","train_info","HorseID","HorseID","hi","ti"),
         Joint("horse_info","extra_info","HorseID","HorseID","hi","ei"),
         Joint("horse_info","horse_result","Pre1ResultID","ResultID","hi","pre1"),
         Joint("horse_info","horse_result","Pre2ResultID","ResultID","hi","pre2"),
@@ -230,9 +259,10 @@ class ORM():
             yield df
 
 class Parse():
-    def __init__(self,formats,is_debug = False):
+    def __init__(self,formats,is_debug = False,file_prefix = None):
         self.formats = formats
         self.is_debug = is_debug
+        self.file_prefix = file_prefix
 
     def parse(self,target_dir):
         start = time.time()
@@ -244,9 +274,13 @@ class Parse():
         for i, path in enumerate(files):
             if self.is_debug and i > PARSE_FILE_NUM_ON_DEBUG:
                 break
+            if self.file_prefix is not None and not path.lower().startswith(self.file_prefix.lower()):
+                continue
             path = os.path.join(target_dir,path)
             records.extend(parse_file(self.formats,path))
 
+        if len(records) == 0:
+            return df
         df = df.append(records)
         print(time.time() - start)
         df = optimize_dtypes(df,self.formats)
@@ -256,7 +290,11 @@ def parse_file(formats,path):
     ls = []
     with open(path,"rb") as fp:
         for line in fp.readlines():
-            ls.append(formats.parse_line(line))
+            try:
+                data = formats.parse_line(line)
+                ls.append(data)
+            except csv_format.ConvertException:
+                continue
     return ls
 
 def optimize_dtypes(df,formats):
@@ -285,8 +323,24 @@ def create_empty_df(formats):
     df = pd.DataFrame(columns = columns)
     return df
 
-def write_dtype_csv(path,df):
+def write_dtype_csv(path,dtypes):
     with open(path,"w") as fp:
-        for k,v in dict(df.dtypes).items():
+        for k,v in dtypes.items():
             row = "{},{}\n".format(k,v)
             fp.write(row)
+
+def update_dtypes(old,new):
+    prioirity = {
+        "object" : 0,
+        "float32" : 1,
+        "int32"   : 1,
+        "float64" : 2,
+        "int64"   : 2,
+    }
+    keys = old.keys()
+    for k in keys:
+        old_dtype = old[k]
+        new_dtype = new[k]
+        if prioirity[str(new_dtype)] > prioirity[str(old_dtype)]:
+            old[k] = new_dtype
+    return old

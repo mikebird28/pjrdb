@@ -1,4 +1,6 @@
 pjrdb/raw_text/
+pjrdb/debug_info/
+pjrdb/dups.csv
 pjrdb/test.db
 pjrdb/test.csv
 pjrdb/output.csv

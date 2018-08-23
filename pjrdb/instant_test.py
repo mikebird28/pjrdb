@@ -1,29 +1,47 @@
 import parse
 import csv_format
 import unittest
+import os
+import pandas as pd
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
 
 
 class FormatTest(unittest.TestCase):
     def test_latest_info(self):
         f = csv_format.Format("latest_info","./formats/latest_info.csv")
-        target_file = "./test_files/latest_info/"
-        show_parse_result(f,target_file)
+        df = get_df(f,"SED")
+        #drop dups
+        df = df.loc[~df.duplicated(),:]
+        dups = df.loc[df.duplicated(subset = "HorseID",keep = False),:]
+        dups_num = len(dups)
+        print(len(dups))
+        if  dups_num != 0:
+            print("output duplicated rows to 'dups.csv")
+            dups = dups.sort_values(by = "HorseID")
+            dups.to_csv("dups.csv")
 
-    def test_horse_info(self):
-        f = csv_format.Format("latest_info","./formats/latest_info.csv")
-        target_file = "./test_files/latest_info/"
-        show_parse_result(f,target_file)
+    def test_extra_info(self):
+        f = csv_format.Format("extra_info","./formats/extra_info.csv")
+        df = get_df(f,"kka")
+        print(df.head())
+        print(df.describe())
 
-def show_parse_result(f, path):
-    is_debug = True
-    parser = parse.Parse(f,is_debug)
+        dups = df.loc[df.duplicated(subset = "HorseID",keep = False),:]
+        dups_num = len(dups)
+        print(len(dups))
+        if  dups_num != 0:
+            print("output duplicated rows to 'dups.csv")
+            dups = dups.sort_values(by = "HorseID")
+            dups.to_csv("dups.csv")
 
+def get_df(f,prefix):
+    is_debug = False
+    target_path = "./raw_text/"
+    parser = parse.Parse(f,is_debug,prefix)
+    path = os.path.join(target_path,f.name)
     df = parser.parse(path)
-    for c in df.columns:
-        name = c
-        value = df.loc[0,c]
-        print("{} : {}".format(name,value))
-
+    return df
 
 if __name__ == "__main__":
     unittest.main()
