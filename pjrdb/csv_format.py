@@ -1,4 +1,5 @@
 import numpy as np
+import pkg_resources
 
 TYPE_INT = 1
 TYPE_FLO = 2
@@ -12,22 +13,22 @@ class Format():
 
     def __load(self):
         values = []
-        with open(self.path) as fp:
-            lines = fp.readlines()
-            for l in lines:
-                contents = l.split(",")
-                v_name = contents[0].strip()
-                v_typ = int(contents[1].strip())
-                v_begin = int(contents[2].strip())
-                v_end = int(contents[3].strip())
-                v_default = contents[4].strip()
-                if len(contents) > 5:
-                    v_not_null = contents[5].strip() == "True"
-                else:
-                    v_not_null = False
-                v_remarks = ",".join(contents[5:])
-                value = Value(v_name,v_typ,v_begin,v_end,v_default,v_remarks,v_not_null)
-                values.append(value)
+        format_str = open_resourse(self.path)
+        lines = format_str.splitlines()
+        for l in lines:
+            contents = l.split(",")
+            v_name = contents[0].strip()
+            v_typ = int(contents[1].strip())
+            v_begin = int(contents[2].strip())
+            v_end = int(contents[3].strip())
+            v_default = contents[4].strip()
+            if len(contents) > 5:
+                v_not_null = contents[5].strip() == "True"
+            else:
+                v_not_null = False
+            v_remarks = ",".join(contents[5:])
+            value = Value(v_name,v_typ,v_begin,v_end,v_default,v_remarks,v_not_null)
+            values.append(value)
         return values
 
     def parse_line(self,line):
@@ -46,8 +47,8 @@ class Value():
         self.typ = typ
         self.begin_at = begin_at
         self.end_at = end_at
-        #self.default_value = fit_type(self.typ,np.nan)
-        self.default_value = np.nan
+        #self.default_value = np.nan
+        self.default_value = self.parse_default_value(typ,default_value)
         self.remarks = remarks
         self.not_null = not_null
 
@@ -61,6 +62,19 @@ class Value():
             else:
                 v = self.default_value
         return v
+
+    def parse_default_value(self,typ,value):
+        try:
+            if value.strip() == "nan":
+                return np.nan
+            elif typ == TYPE_INT:
+                return fit_type(typ,value)
+            elif typ == TYPE_FLO:
+                return fit_type(typ,value)
+            elif typ == TYPE_CAT:
+                return value
+        except ConvertException:
+            raise Exception("default value something wrong, {} : {}".format(self.name,value))
 
 def fit_type(typ,v):
     if typ == TYPE_INT:
@@ -92,9 +106,12 @@ def to_flo(v):
 
 def to_cat(v):
     try:
-        v = v.decode("cp932")
+        #v = v.decode("cp932")
         iv = v.strip() + "s"
         return iv
     except:
         raise ConvertException("failed to convert value to categorical")
+
+def open_resourse(path):
+    return pkg_resources.resource_string(__name__, path).decode()
 

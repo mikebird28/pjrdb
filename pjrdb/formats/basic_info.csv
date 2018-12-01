@@ -1,0 +1,12 @@
+PedigreeID,3,0,8,nd
+SexCode,3,44,45,nd
+ColorCode,3,45,47,nd
+TypeCode,3,47,49,nd
+FatherName,3,49,85,nd
+MotherName,3,85,121,nd
+MFatherName,3,121,157,nd
+BirthDay,3,157,165,nd
+FPedigreeCode1,3,276,278,nd
+FPedigreeCode2,3,278,280,nd
+MFPedigreeCode1,3,280,282,nd
+MFPedigreeCode2,3,282,284,nd

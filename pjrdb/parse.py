@@ -6,13 +6,13 @@ import numpy as np
 import gc
 import sqlite3
 from tqdm import tqdm
-import csv_format
+from . import csv_format
 
 PARSE_FILE_NUM_ON_DEBUG = 50
 
-
 target_prefix = {
     "horse_result" : "SED",
+    "basic_info"   : "UKC",
     "horse_info"   : "KYI",
     "latest_info"  : "TYB",
     "race_info"    : "BAC",
@@ -21,17 +21,21 @@ target_prefix = {
 }
 
 formats = [
-    csv_format.Format("horse_result","./formats/horse_result.csv"),
-    csv_format.Format("horse_info","./formats/horse_info.csv"),
-    csv_format.Format("race_info","./formats/race_info.csv"),
-    csv_format.Format("latest_info","./formats/latest_info.csv"),
-    csv_format.Format("extra_info","./formats/extra_info.csv"),
-    csv_format.Format("train_info","./formats/train_info.csv"),
+    csv_format.Format("horse_result","formats/horse_result.csv"),
+    csv_format.Format("basic_info","formats/basic_info.csv"),
+    csv_format.Format("horse_info","formats/horse_info.csv"),
+    csv_format.Format("race_info","formats/race_info.csv"),
+    csv_format.Format("latest_info","formats/latest_info.csv"),
+    csv_format.Format("extra_info","formats/extra_info.csv"),
+    csv_format.Format("train_info","formats/train_info.csv"),
 ]
+
+formats_dict = {f.name : f for f in formats}
 
 #remove duplicates before merege
 drop_dict = {
     "horse_result" : ["HorseID","ResultID"],
+    "basic_info" : ["PedigreeID"],
     "horse_info" : ["HorseID"],
     "race_info" : ["RaceID"],
     "latest_info" : ["HorseID"],
@@ -39,6 +43,40 @@ drop_dict = {
     "train_info" : ["HorseID"],
 }
 
+def parse_latest_df(raw_dir, is_debug = False, output_path="./latest.csv", db_path="./cache_db"):
+    prefixes = [p.lower() for p in target_prefix.values()]
+    prefixes_count = {p.lower():0 for p in prefixes}
+    prefixes_dict = {v.lower():k for k,v in target_prefix.items()}
+
+    df_dict = {} # Dictionary which hold parsed dataframe.
+    files = [fname for fname in os.listdir(raw_dir) if os.path.isfile(os.path.join(raw_dir,fname))]
+
+    # Parse all files in raw_dir
+    for f in files:
+        for p in prefixes:
+            # If prefix doesn't match, continue.
+            if not f.lower().startswith(p):
+                continue
+            prefixes_count[p] = prefixes_count[p] + 1 # Increment prefix counter. Check count after loop to detect problem.
+            file_path = os.path.join(raw_dir,f)
+            format_name = prefixes_dict[p]
+            formatter = formats_dict[format_name] # Get formatter which match to prefix.
+            parser = Parse(formatter,is_debug,p)
+            df = parser.parse_file(file_path)
+            df_dict[format_name] = df.copy()
+            del(df);gc.collect()
+
+    # Check counts
+    for prefix, count in prefixes_count.items():
+        if prefix == "sed" and count != 0:
+            raise Exception("this directory contains 'horse_result")
+        elif prefix != "sed" and count > 1:
+            raise Exception("this directory contains duplicate {} files".format(prefix))
+        elif prefix != "sed" and count < 1:
+            raise Exception("this directory doesn't have {}.".format(prefix))
+    return df_dict
+
+# Main Function to create horse race csv file for machine learning"
 def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache.db"):
     #load formats file
     df_dict = {}
@@ -47,9 +85,10 @@ def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache
         print("[*] parsing {}".format(f.name))
         file_prefix = target_prefix[f.name]
         parser = Parse(f,is_debug,file_prefix)
+
+        #parse all files in path
         path = os.path.join(target_path,f.name)
-        
-        df = parser.parse(path)
+        df = parser.parse_dir(path)
         df_dict[f.name] = df.copy()
         del(df);gc.collect()
 
@@ -114,8 +153,9 @@ def merge_df(db_con,chunk_size):
     orm = ORM(db_con, "output")
     joints = [
         Joint("horse_info","horse_result","HorseID","HorseID","hi","hr",how = "inner"),
-        Joint("horse_info","race_info","RaceID","RaceID","hi","ri"),
         Joint("horse_info","latest_info","HorseID","HorseID","hi","li"),
+        Joint("horse_info","race_info","RaceID","RaceID","hi","ri"),
+        Joint("horse_info","basic_info","PedigreeID","PedigreeID","hi","bi"),
         Joint("horse_info","train_info","HorseID","HorseID","hi","ti"),
         Joint("horse_info","extra_info","HorseID","HorseID","hi","ei"),
         Joint("horse_info","horse_result","Pre1ResultID","ResultID","hi","pre1"),
@@ -264,7 +304,14 @@ class Parse():
         self.is_debug = is_debug
         self.file_prefix = file_prefix
 
-    def parse(self,target_dir):
+    def parse_file(self,target_file):
+        df = create_empty_df(self.formats)
+        record = parse_file(self.formats,target_file)
+        df = df.append(record)
+        df = optimize_dtypes(df,self.formats)
+        return df
+
+    def parse_dir(self,target_dir):
         start = time.time()
         df = create_empty_df(self.formats)
         records = []
@@ -290,11 +337,12 @@ def parse_file(formats,path):
     ls = []
     with open(path,"rb") as fp:
         for line in fp.readlines():
+            line = line.decode("cp932")
             try:
                 data = formats.parse_line(line)
                 ls.append(data)
             except csv_format.ConvertException:
-                continue
+                raise Exception("convert error")
     return ls
 
 def optimize_dtypes(df,formats):

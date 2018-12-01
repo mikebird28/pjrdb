@@ -10,8 +10,10 @@ pd.set_option('display.max_rows', None)
 class FormatTest(unittest.TestCase):
     def test_latest_info(self):
         f = csv_format.Format("latest_info","./formats/latest_info.csv")
-        df = get_df(f,"SED")
+        df = get_df(f,"TYB")
         #drop dups
+        print(df.describe())
+        #print(df["EquipmentChange"])
         df = df.loc[~df.duplicated(),:]
         dups = df.loc[df.duplicated(subset = "HorseID",keep = False),:]
         dups_num = len(dups)
@@ -36,7 +38,7 @@ class FormatTest(unittest.TestCase):
             dups.to_csv("dups.csv")
 
 def get_df(f,prefix):
-    is_debug = False
+    is_debug = True
     target_path = "./raw_text/"
     parser = parse.Parse(f,is_debug,prefix)
     path = os.path.join(target_path,f.name)

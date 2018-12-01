@@ -12,8 +12,8 @@ TrainCourseObstacle,3,23,25,0
 TrainCoursePoly,3,25,27,0
 TrainDistance,3,27,28,0
 TrainPoint,3,28,29,0
-ChaseScore,2,29,30,0
-FinishScore,2,30,33,0
-TrainAmountEvaluation,3,33,36,0
+ChaseScore,2,29,32,0
+FinishScore,2,32,35,0
+TrainAmountEvaluation,3,35,36,0
 FiishScoreDelta,2,36,37,0
 TrainEvaluation,3,85,86,0

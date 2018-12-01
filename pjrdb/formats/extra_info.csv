@@ -57,7 +57,7 @@ MiddlePaceFirst,1,166,169,0
 MiddlePaceSecond,1,169,172,0
 MiddlePaceThird,1,172,175,0
 MiddlePaceLose,1,175,178,0
-HightPaceFirst,1,178,181,0
+HighPaceFirst,1,178,181,0
 HighPaceSecond,1,181,184,0
 HighPaceThird,1,184,187,0
 HighPaceLose,1,187,190,0
@@ -90,7 +90,7 @@ JockeyBrinkerSecond,1,265,268,0
 JockeyBrinkerThird,1,268,271,0
 JockeyBrinkerLose,1,271,274,0
 TrainerOwnerFirst,1,274,277,0
-TranerOwnerSecond,1,277,280,0
+TrainerOwnerSecond,1,277,280,0
 TrainerOwnerThird,1,280,283,0
 TrainerOwnerLose,1,283,286,0
 FatherTurfQuinellaPer,2,286,289,0
