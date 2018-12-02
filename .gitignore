@@ -5,3 +5,5 @@ pjrdb/test.db
 pjrdb/test.csv
 pjrdb/output.csv
 test_outputs/
+raw_csv/
+.vscode

@@ -1,5 +1,7 @@
 
 clean:
+	rm -rf pjrdb/__pycache__
+	rm -rf test/__pycache__
 	rm -rf test_outputs
 	rm -f *.pyc
 	rm -f pjrdb/*.pyc

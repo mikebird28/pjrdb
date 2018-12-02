@@ -35,8 +35,16 @@ TARGETS = [
 
 LATEST_URL = "http://www.jrdb.com/member/data/"
 
-# Main function to get latest infrormation.
+
 def fetch_latest_dataset(date,output_path,tmp_path,username,password):
+    """ Main function to get latest infrormation.
+    Args:
+        date(datetime.date) : The date of csv file you want to download.
+        output_path(str) : directory path to save csv files.
+        tmp_path(str) : directory to save temporaly compressed csv files.
+        username(str) : username of pjrdb.
+        password(str) : password for pjrdb.
+    """
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     if not os.path.exists(tmp_path):
@@ -63,12 +71,36 @@ def fetch_latest_dataset(date,output_path,tmp_path,username,password):
     for file_path in downloaded_files:
         extract_file(file_path,output_path)
 
-# Main function to get all past datasets
-def fetch_all_datasets(root_path,username,password):
+def fetch_all_datasets(root_path,username,password,num = None):
+    """ # Main function to download past race csv files.
+    This function download csv files and put them like this.
+    Ex.)
+    output_path/
+        horse_result/
+            sed20181201.csv
+            sed20181202.csv
+            ...
+        latest_info/
+            uty20181201.csv
+            ...
+        ...
+        compressed_horse_result/
+        compressed_latest_info/
+        ....
+
+    Args:
+        root_path(str) : 
+        username(str) : username of jrdb.
+        password(str) : password for jrdb.
+        num(int) : max number of download csv files.
+    Returns:
+        None
+    """
+
     f = Fetcher(username,password)
     for typ in TARGETS:
         dir_name = "compressed_" + typ
-        f.fetch(typ,os.path.join(root_path,dir_name))
+        f.fetch(typ,os.path.join(root_path,dir_name),num = num)
 
     #decompress all compressed datasets
     for typ in TARGETS:
@@ -138,6 +170,7 @@ class TypeInfo():
         self.ls_func = ls_func
 
 class Fetcher():
+    # Fetch past race csv files from jrdb.
     type_dict = {
         "horse_info"   : TypeInfo("http://www.jrdb.com/member/datazip/Kyi/index.html",fetch_dates_list),
         "horse_result" : TypeInfo("http://www.jrdb.com/member/datazip/Sed/index.html",fetch_dates_list),
@@ -152,18 +185,40 @@ class Fetcher():
     }
 
     def  __init__(self,username,password):
+        """ Init instance
+        Args:
+            username(str) : user name of jrdb.
+            password(str) : password for jrdb.
+
+        """
         self.username = username
         self.password = password
 
-    def fetch(self,typ,dir_path,skip_exists = True):
+    def fetch(self,typ,dir_path,skip_exists = True,num = None, interval = 0.5):
+        """ Fetch csvs from jrdb.
+        Args:
+            typ(str) : type of csv files you want to download. Ex.) "horse_result"
+            dir_path(str) : path to save downloaed csv files.
+            skip_exists(bool) : if csv file has already exist, skip download. Default is True.
+            num(int or None) : Number of csv files to download. If None, download all csv files. Default is None.
+            interval(int) : interval time of each download.
+        """
+        print(typ)
         create_directory(dir_path)
         typc = self._type_context(typ)
         root_url = typc.root_url
-        ls_func = typc.ls_func
-        ls = ls_func(root_url,self.username,self.password)
-        length = len(ls)
-        print(typ)
+        ls_func = typc.ls_func # Function to get list of avairable csv files.
+        ls = ls_func(root_url,self.username,self.password) # Fetch list of csv files.
+
+        # Check nums and decide length.
+        if num is None:
+            length = len(ls)
+        else:
+            length = min(len(ls), num)
+
         for count,url in enumerate(ls):
+            if count >= length:
+                break
             file_exist = exist_file(dir_path,parse_filename(url))
             if file_exist and skip_exists:
                 sys.stdout.write("({0}/{1}) {2} ...".format(count+1,length,url))
@@ -175,19 +230,26 @@ class Fetcher():
             status = fetch_zip(url,self.username,self.password,dir_path)
             sys.stdout.write("{0}\n".format(status))
             sys.stdout.flush()
-            time.sleep(1.0)
+            time.sleep(interval)
 
     def _type_context(self,typ):
         return self.type_dict[typ]
 
 # Fetch zipped datasets from JRDB.
-def fetch_zip(url,username,password,directory):
-    r = requests.get(url,auth = HTTPBasicAuth(username,password))
-    status = r.status_code
-    if status != 200:
-        return status
-    content = r.content
+def fetch_zip(url,username,password,directory,retry_num = 3):
+    # Retry until success or come retry_num.
+    success_flag = False
+    for _ in range(retry_num):
+        r = requests.get(url,auth = HTTPBasicAuth(username,password))
+        status = r.status_code
+        if status == 200:
+            success_flag = True
+            break
 
+    if not success_flag:
+        return r.status
+
+    content = r.content
     file_name = parse_filename(url)
     file_path = os.path.join(directory,file_name)
     with open(file_path,"wb") as fp:
@@ -227,12 +289,6 @@ def extract_files(dir_path,unzipped_path):
 def unzip(file_path,unzipped_path):
     with zipfile.ZipFile(file_path,"r") as zf:
         zf.extractall(path = unzipped_path)
-
-"""
-def unlzh(file_path,unzipped_path):
-    command = "lhasa xqw={0} {1}".format(unzipped_path,file_path)
-    subprocess.call(command,shell=True)
-"""
 
 def remove_extension(s):
     s = re.sub(r"\..+","",s)

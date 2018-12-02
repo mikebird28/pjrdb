@@ -20,5 +20,9 @@ class TestFetcher(unittest.TestCase):
         date = datetime.date(2018,12,1)
         fetcher.fetch_latest_dataset(date,output_path,tmp_path,username,password)
 
+    def test_fetch_all_dataset(self):
+        download_path = "./test_outputs/fetch"
+        fetcher.fetch_all_datasets(download_path,username,password,3)
+
 if __name__ == "__main__":
     unittest.main()
