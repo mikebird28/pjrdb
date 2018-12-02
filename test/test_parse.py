@@ -15,6 +15,6 @@ class TestFetcher(unittest.TestCase):
         if not os.path.exists(test_path):
             os.makedirs(test_path)
         date = datetime.date(2018,12,1)
-        fetcher.parse_latest_dataset(date, output_path, tmp_path, username, password)
-        parse.create_latest_df(output_path)
+        fetcher.fetch_latest_dataset(date, output_path, tmp_path, username, password)
+        parse.parse_latest_df(output_path)
 

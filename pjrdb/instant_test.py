@@ -45,5 +45,5 @@ def get_df(f,prefix):
     df = parser.parse(path)
     return df
 
-if __name__ == "__main__":
-    unittest.main()
+#if __name__ == "__main__":
+#    unittest.main()

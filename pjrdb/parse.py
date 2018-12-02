@@ -77,10 +77,10 @@ def parse_latest_df(raw_dir, is_debug = False, output_path="./latest.csv", db_pa
     return df_dict
 
 # Main Function to create horse race csv file for machine learning"
-def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache.db"):
+def create_database(db_path,csv_dir,is_debug = False):
     #load formats file
     df_dict = {}
-    target_path = "./raw_text/"
+    target_path = csv_dir
     for f in formats:
         print("[*] parsing {}".format(f.name))
         file_prefix = target_prefix[f.name]
@@ -100,12 +100,13 @@ def create_df(is_debug = False, output_path = "./output.csv", db_path = "./cache
 
     print("[*] creating sql database")
     start_time = time.time()
-    db_con = to_sql("./test.db",df_dict)
+    #db_con = to_sql("./test.db",df_dict)
+    to_sql(db_path,df_dict)
     elapsed_time = time.time() - start_time
     print(elapsed_time)
     del(df_dict);gc.collect()
-    #print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 
+def generate_formed_csv(output_path):
     print("[*] generating output dataset")
     start_time = time.time()
     count = 0
